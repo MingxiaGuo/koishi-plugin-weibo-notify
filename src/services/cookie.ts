@@ -3,6 +3,7 @@ import { USER_AGENT_LIST } from './constant'
 
 let auto_cookie: string | null = null
 let now_user_agent: string | null = null
+let cookie_updater: (() => Promise<string | null>) | null = null
 
 export function setCookie(cookie: string | null) {
   auto_cookie = cookie
@@ -22,6 +23,16 @@ export function getUserAgent(): string | null {
 
 export function getRandomUserAgent(): string {
   return USER_AGENT_LIST[Math.floor(Math.random() * USER_AGENT_LIST.length)]
+}
+
+export function setCookieUpdater(updater: (() => Promise<string | null>) | null) {
+  cookie_updater = updater
+}
+
+export function extractXSRFToken(cookie: string | null): string {
+  if (!cookie) return ''
+  const match = cookie.match(/XSRF-TOKEN=([^;]+)/i)
+  return match ? match[1] : ''
 }
 
 const mergeCookies = (cookies: string[]): string => {
@@ -84,3 +95,16 @@ export async function fetchCookie(): Promise<string> {
   return mergeCookies(allCookies)
 }
 
+export async function refreshCookie(): Promise<string | null> {
+  if (cookie_updater) {
+    const nextCookie = await cookie_updater()
+    if (nextCookie) {
+      setCookie(nextCookie)
+      return nextCookie
+    }
+  }
+
+  const fallbackCookie = await fetchCookie()
+  setCookie(fallbackCookie)
+  return fallbackCookie
+}

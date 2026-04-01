@@ -55,8 +55,13 @@ export function parseDateString(dateString: string): Date {
 export function checkWords(params: any, message: string): boolean {
   if (message == null)
     return false
-  let keywordsList = params.keywords?.split(';') || []
-  let blockwordsList = params.blockwords?.split(';') || []
+  const normalizeWordList = (value: unknown) => {
+    if (Array.isArray(value)) return value.filter(Boolean).map(item => String(item).trim()).filter(Boolean)
+    if (typeof value === 'string') return value.split(';').map(item => item.trim()).filter(Boolean)
+    return []
+  }
+  let keywordsList = normalizeWordList(params.keywords)
+  let blockwordsList = normalizeWordList(params.blockwords)
   if (keywordsList.length > 0) {
     let hasKeywords = false
     for (const keyword of keywordsList) {

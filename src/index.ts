@@ -1,32 +1,62 @@
 import { Context, Logger } from 'koishi'
-import { Config, type Config as ConfigType } from './services/config'
-import { USER_AGENT_LIST } from './services/constant'
-import { setCookie, setUserAgent } from './services/cookie'
+import type { Config as PluginConfig } from './services/config'
+export { Config } from './services/config'
+import { applyAccountService } from './services/account-server'
 import { getWeiboAndSendMessageToGroup } from './services/message'
 
-export const name = 'weibo-post-monitor'
+export const name = 'weibo-notify'
 
-export { Config }
+export const logger = new Logger(name)
 
-export let logger = new Logger(name)
+export const using = ['puppeteer', 'database']
+export const inject = {
+  required: ['database', 'puppeteer'],
+  optional: ['console', 'server'],
+}
 
-export function apply(ctx: Context, config: ConfigType) {
+declare module 'koishi' {
+  interface Tables {
+    weibo_cookies: WeiboCookie
+  }
+}
+
+export interface WeiboCookie {
+  name: string
+  value: string
+  domain: string
+  updatedAt: Date
+}
+
+export function apply(ctx: Context, config: PluginConfig) {
+  ctx.model.extend('weibo_cookies', {
+    name: 'string',
+    value: 'string',
+    domain: 'string',
+    updatedAt: 'timestamp',
+  }, {
+    primary: ['name', 'domain'],
+  })
+
+  const basic = config.basic || { account: '', platform: 'onebot', waitMinutes: 3, cookieRefreshIntervalHours: 72 }
+  const subs = config.subs || []
   const commonConfig = {
-    account: config.account,
-    plantform: config.plantform,
-    waitMinutes: config.waitMinutes,
-    is_using_cookie: config.is_using_cookie,
+    account: basic.account,
+    platform: basic.platform,
+    waitMinutes: basic.waitMinutes,
   }
 
-  if(config.is_using_cookie){
-    setCookie(config.manual_cookie)
-  }
-  setUserAgent(USER_AGENT_LIST[0])
+  // 账户服务（主要是 Cookie 加载）初始化
+  applyAccountService(ctx, config, logger)
+
+
+  const intervalMs = basic.waitMinutes > 0 ? basic.waitMinutes * 60 * 1000 : 60000
+  logger.info(`[weibo-notify] 插件已启动，配置了 ${subs.length} 个订阅，轮询间隔: ${intervalMs}ms`)
 
   ctx.setInterval(async () => {
-    for (const singleConfig of config.sendINFO) {
+    for (const singleConfig of subs) {
       const params = { ...commonConfig, ...singleConfig }
       getWeiboAndSendMessageToGroup(ctx, params)
     }
-  }, config.waitMinutes > 0 ? config.waitMinutes * 60 * 1000 : 60000)
+  }, intervalMs)
+
 }
