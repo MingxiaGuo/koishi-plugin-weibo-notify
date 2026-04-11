@@ -1,7 +1,7 @@
 {
-  "name": "koishi-plugin-weibo-post-monitor",
-  "description": "微博帖子更新推送插件，用于获取指定微博用户的最新帖子推送到指定群聊，参考代码https://github.com/moehuhu/weibo-monitor",
-  "version": "1.0.3",
+  "name": "koishi-plugin-weibo-notify",
+  "description": "微博帖子更新推送插件，用于获取指定微博用户的最新帖子推送到指定群聊",
+  "version": "1.0.5",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
@@ -9,18 +9,60 @@
     "dist"
   ],
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "build": "npm run build:client && tsc -p tsconfig.json",
+    "build:client": "node -e \"require('@koishijs/client/lib').build(process.cwd())\"",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MingxiaGuo/koishi-plugin-weibo-notify.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MingxiaGuo/koishi-plugin-weibo-notify/issues"
+  },
+  "homepage": "https://github.com/MingxiaGuo/koishi-plugin-weibo-notify#readme",
+  "author": "MingxiaGuo",
   "keywords": [
     "chatbot",
     "koishi",
-    "plugin"
+    "plugin",
+    "weibo",
+    "monitor",
+    "puppeteer",
+    "cookie"
   ],
-  "devDependencies": {},
+  "koishi": {
+    "description": {
+      "zh": "微博帖子更新推送，支持扫码登录自动获取/刷新 Cookie（依赖 puppeteer 服务）。",
+      "en": "Monitor Weibo posts and push to groups, with QR login auto-updating cookies (requires puppeteer service)."
+    },
+    "service": {
+      "required": [
+        "puppeteer"
+      ],
+      "optional": [
+        "console"
+      ]
+    },
+    "locales": [
+      "zh",
+      "en"
+    ]
+  },
+  "devDependencies": {
+    "@koishijs/client": "^5.13.1",
+    "@types/node": "^20.11.30",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.0",
+    "vue": "^3.5.13"
+  },
   "peerDependencies": {
-    "koishi": "^4.18.7"
+    "koishi": "^4.18.7",
+    "koishi-plugin-puppeteer": "^3.9.0"
   },
   "dependencies": {
-    "https": "^1.0.0",
-    "axios": "^1.0.0"
+    "axios": "^1.0.0",
+    "https": "^1.0.0"
   }
 }

@@ -3,7 +3,7 @@ import { getWeibo } from './weibo'
 import { stripHtmlTags, to } from './utils'
 import { parseDateString, checkWords } from './utils'
 import axios from 'axios'
-import { getCookie, getUserAgent } from './cookie'
+import { getCookie, getUserAgent, extractXSRFToken } from './cookie'
 import { logger } from ".."
 
 export async function getWeiboAndSendMessageToGroup(ctx: Context, params: any) {
@@ -11,13 +11,29 @@ export async function getWeiboAndSendMessageToGroup(ctx: Context, params: any) {
   if (err) { ctx.logger.error(err); return }
   const data = res.data || {}
   const weiboList = data.list || []
+
+  if (weiboList.length === 0) {
+    ctx.logger.debug(`[getWeiboAndSendMessageToGroup] 未获取到微博列表数据，UID: ${params.weiboUID}`)
+    return
+  }
+
   const result = await getLastPost(params, weiboList)
   if (!result) { return }
+
+  // 走到这里说明不仅抓取到了新微博，而且通过了时间检查和关键词过滤，准备发送
+  ctx.logger.info(`[weibo-notify] 抓取到新微博！UID: ${params.weiboUID}, 准备推送到群组: ${params.groupID}`)
+
   let message = result
   if (params.sendAll) {
     message = h.at('all') + ' ' + message
   }
-  ctx.bots[`${params.plantform}:${params.account}`].sendMessage(params.groupID, message)
+  const bot = ctx.bots[`${params.platform}:${params.account}`]
+  if (!bot) {
+    ctx.logger.warn(`未找到机器人实例: ${params.platform}:${params.account}`)
+    return
+  }
+  ctx.logger.debug(`检测到新微博发出，准备推送到群组 ${params.groupID}`)
+  bot.sendMessage(params.groupID, message)
 }
 
 async function getLastPost(params: any, weiboList: any): Promise<string | null> {
@@ -34,9 +50,12 @@ async function getMessage(params: any, wbPost: any): Promise<{ post: string; isl
   const { created_at, user } = wbPost
   const time = parseDateString(created_at)
   const lastCheckTime = Date.now() - (params.waitMinutes > 0 ? params.waitMinutes * 60 * 1000 : 60000)
+
   if (time.getTime() < lastCheckTime) {
+    logger.debug(`[getMessage] 微博时间(${time.toISOString()})早于上次检查时间(${new Date(lastCheckTime).toISOString()})，跳过`)
     return null
   }
+
   const screenName = user?.screen_name || ''
   let weiboType = -1
   //获取微博类型0-视频，2-图文,1-转发微博
@@ -102,16 +121,7 @@ async function getDetailMessage(wb_url: any): Promise<string | null> {
       return null
     }
 
-    // 从 cookie 中提取 XSRF-TOKEN
-    let xsrfToken = ''
-    const cookieParts = auto_cookie.split(';')
-    for (const part of cookieParts) {
-      const trimmed = part.trim()
-      if (trimmed.startsWith('XSRF-TOKEN=')) {
-        xsrfToken = trimmed.substring('XSRF-TOKEN='.length)
-        break
-      }
-    }
+    const xsrfToken = extractXSRFToken(auto_cookie)
 
     // 从 URL 中提取微博 ID，用于构建 referer
     const urlMatch = wb_url.match(/id=(\d+)/)
