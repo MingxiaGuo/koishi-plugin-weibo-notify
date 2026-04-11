@@ -4,14 +4,31 @@ import { resolve } from 'node:path'
 import type { Context, Logger } from 'koishi'
 import type { Config as PluginConfig } from './config'
 import { USER_AGENT_LIST } from './constant'
-import { getCookie, setCookie, setCookieUpdater, setUserAgent } from './cookie'
-import { captureQrFromPage, loginWithQrViaService, renewCookiesViaService, loadCookieStringFromDatabase, loadCookiesFromDatabase, saveCookiesToDatabase } from './puppeteer-cookie'
-import {
-  ACCOUNT_API_PREFIX,
-  ACCOUNT_LOGIN_URL,
-  type LoginPanelState,
-  type WeiboProfile,
-} from './account'
+import { getCookie, setCookie, setCookieUpdater, setUserAgent, captureQrFromPage, loginWithQrViaService, renewCookiesViaService, loadCookieStringFromDatabase, loadCookiesFromDatabase, saveCookiesToDatabase } from './cookie'
+
+export const ACCOUNT_API_PREFIX = '/weibo-notify/api'
+export const ACCOUNT_LOGIN_URL = 'https://passport.weibo.com/'
+
+
+export interface WeiboProfile {
+  screenName: string | null
+  avatarUrl: string | null
+  uid: string | null
+}
+export interface LoginPanelState {
+  status: 'idle' | 'pending' | 'success' | 'error'
+  message: string
+  lastError: string | null
+  hasCookie: boolean
+  cookieStatusText: string
+  autoLoginEnabled: boolean
+  qrImageDataUrl: string | null
+  cookieFile: string
+  lastQrUpdatedAt: number | null
+  lastCookieRefreshAt: number | null
+  loginUrl: string
+  profile: WeiboProfile | null
+}
 
 export function applyAccountService(ctx: Context, config: PluginConfig, logger: Logger) {
   const cookieFile = 'Koishi Database (weibo_cookies)'

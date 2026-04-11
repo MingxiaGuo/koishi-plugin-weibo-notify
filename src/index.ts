@@ -1,7 +1,7 @@
 import { Context, Logger } from 'koishi'
 import type { Config as PluginConfig } from './services/config'
 export { Config } from './services/config'
-import { applyAccountService } from './services/account-server'
+import { applyAccountService } from './services/login'
 import { getWeiboAndSendMessageToGroup } from './services/message'
 
 export const name = 'weibo-notify'

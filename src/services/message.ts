@@ -91,7 +91,7 @@ async function getMessage(params: any, wbPost: any): Promise<{ post: string; isl
     const picIds = wbPost?.pic_ids || []
     const picInfos = wbPost?.pic_infos || {}
     const firstPicUrl = picInfos?.[picIds[0]]?.large?.url || ''
-    const picture = h.image(firstPicUrl)
+    const picture = params.sub_showScreenshot !== false ? h.image(firstPicUrl) : ''
     tempMessage += (screenName + " 发布了微博:\n{temp_text}\n" + picture) || ''
   }
   const mid = wbPost?.mid || ''
