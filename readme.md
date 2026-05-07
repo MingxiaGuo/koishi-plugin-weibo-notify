@@ -34,13 +34,17 @@ npm i koishi-plugin-puppeteer
   - cookieRefreshIntervalHours：cookie自动刷新间隔（小时）
 - subs：数组，配置监听与发送目标
   - weiboUID：微博用户 UID
+  - weiboUserName: 微博用户昵称
   - forward：是否监听转发
   - blockwords：屏蔽词，分号分隔
   - keywords：关键词，分号分隔
   - groupID：需要发送的群组
   - sendAll：是否 @全体成员
-- puppeteer（可选）：扫码登录设置
-  - cookieFile：Cookie 保存路径，默认 data/weibo/cookies.json
+  - sub_sendText: 是否发送提取的微博文本
+  - sub_showScreenshot: 是否发送微博截图
+  - sub_sendMedia: 是否发送微博中的图片和视频
+  - sub_sendVideoCover: 是否发送微博视频的封面图代替视频，开启后，视频会被替换为封面图
+  - sub_splitMessages: 是否分条发送消息？开启后，文本、截图和每张图片/视频都会作为独立消息发送
 
 示例（片段）：
 
@@ -52,17 +56,17 @@ npm i koishi-plugin-puppeteer
     "waitMinutes": 3,
     "cookieRefreshIntervalHours": 72
   },
-  "puppeteer": {
-    "cookieFile": "data/weibo/cookies.json"
-  },
   "subs": [
     {
       "weiboUID": "1234567890",
+      "weiboUserName": "XXX",
       "forward": false,
       "blockwords": "",
       "keywords": "",
       "groupID": "987654321",
       "sendAll": false
+      "sub_sendText": true,
+      "sub_showScreenshot": true
     }
   ]
 }

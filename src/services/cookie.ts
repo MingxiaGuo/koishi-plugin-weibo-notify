@@ -174,7 +174,8 @@ async function wait(ms: number) {
 
 async function isLoggedIn(page: any): Promise<boolean> {
   try {
-    const cookies = await page.cookies()
+    const client = await page.target().createCDPSession()
+    const { cookies } = await client.send('Network.getAllCookies')
     // 微博登录成功的核心标志是存在 SUB (Session User Badge) cookie
     const hasSub = cookies.some((c: any) => c.name === 'SUB')
     return hasSub
@@ -341,16 +342,14 @@ export async function loginWithQrViaService(ctx: any, opts: QrLoginOptions = {})
 
     // Try to find and click QR tab multiple times
     for (let i = 0; i < 3; i++) {
-      // 检查是否被重定向到了个人中心或首页 (说明已经登录了)
-      const currentUrl = page.url()
-      if (currentUrl.includes('my.sina.com.cn') || currentUrl.includes('weibo.com/u/')) {
-        const cookies = await page.cookies()
-        if (cookies.some((c: any) => c.name === 'SUB')) {
-          return {
-            cookieString: buildCookieString(cookies),
-            cookies,
-            qrDetected: true, // 伪装成已检测到，跳过报错
-          }
+      // 检查是否已经登录
+      if (await isLoggedIn(page)) {
+        const client = await page.target().createCDPSession()
+        const { cookies } = await client.send('Network.getAllCookies')
+        return {
+          cookieString: buildCookieString(cookies),
+          cookies,
+          qrDetected: true, // 伪装成已检测到，跳过报错
         }
       }
 
@@ -364,9 +363,9 @@ export async function loginWithQrViaService(ctx: any, opts: QrLoginOptions = {})
     await wait(2000)
 
     // 检查是否已经存在 SUB 并且被重定向
-    const currentUrl = page.url()
-    if (currentUrl.includes('my.sina.com.cn') || currentUrl.includes('weibo.com/u/') || await isLoggedIn(page)) {
-      const cookies = await page.cookies()
+    if (await isLoggedIn(page)) {
+      const client = await page.target().createCDPSession()
+      const { cookies } = await client.send('Network.getAllCookies')
       return {
         cookieString: buildCookieString(cookies),
         cookies,
@@ -399,7 +398,13 @@ export async function loginWithQrViaService(ctx: any, opts: QrLoginOptions = {})
     if (!(await isLoggedIn(page))) {
       throw new Error('扫码登录超时')
     }
-    const cookies = await page.cookies()
+
+    // 强制访问一次主站，确保种下 XSRF-TOKEN 等环境 Cookie
+    await gotoAndWait(page, 'https://weibo.com/', 10000).catch(() => { })
+    await wait(2000)
+
+    const client = await page.target().createCDPSession()
+    const { cookies } = await client.send('Network.getAllCookies')
     const cookieString = buildCookieString(cookies)
     return {
       cookieString,

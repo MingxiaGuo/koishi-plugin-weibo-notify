@@ -8,7 +8,6 @@ export const name = 'weibo-notify'
 
 export const logger = new Logger(name)
 
-export const using = ['puppeteer', 'database']
 export const inject = {
   required: ['database', 'puppeteer'],
   optional: ['console', 'server'],

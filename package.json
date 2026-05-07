@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-weibo-notify",
   "description": "微博帖子更新推送插件，用于获取指定微博用户的最新帖子推送到指定群聊",
-  "version": "1.0.6",
+  "version": "1.0.20",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [

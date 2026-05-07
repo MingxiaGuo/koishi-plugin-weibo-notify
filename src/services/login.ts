@@ -126,6 +126,11 @@ export function applyAccountService(ctx: Context, config: PluginConfig, logger: 
       ? (rawAvatarUrl.startsWith('//') ? `https:${rawAvatarUrl}` : rawAvatarUrl)
       : null
     const uid = user.id ? String(user.id) : (user.uid ? String(user.uid) : null)
+
+    // 严格过滤掉过期未登录页面的错误数据
+    if (uid && !/^\d{5,}$/.test(uid)) return null
+    if (screenName && (screenName.includes('通行证') || screenName.includes('登录') || screenName.includes('微博-') || screenName.includes('��'))) return null
+
     if (!screenName && !avatarUrl && !uid) return null
     if (uid === '1' && !screenName) return null
     return { screenName, avatarUrl, uid }
@@ -398,6 +403,14 @@ export function applyAccountService(ctx: Context, config: PluginConfig, logger: 
       if (result.qrImageDataUrl) {
         updateQrImage(result.qrImageDataUrl)
       }
+
+      // logger.debug(`[weibo-notify] 扫码提取到的完整 Cookie 字符串: ${result.cookieString}`)
+
+      const hasSub = result.cookies.some((c: any) => c.name === 'SUB')
+      if (!hasSub) {
+        throw new Error('扫码登录失败：未获取到核心凭证 (SUB)，可能是扫码超时或被视为游客')
+      }
+
       await saveCookiesToDatabase(ctx, result.cookies)
       setCookie(result.cookieString)
       await syncProfile(result.cookieString)
@@ -456,7 +469,8 @@ export function applyAccountService(ctx: Context, config: PluginConfig, logger: 
   setCookieUpdater(refreshCookieWithPuppeteer)
 
   const registerConsoleEntry = () => {
-    const consoleService = ctx.get('console') as any
+    const consoleService = (ctx as any).console || (ctx as any).get?.('console')
+    logger.info(`[weibo-notify] 尝试注册控制台入口, consoleService 存在: ${!!consoleService}, 已注册: ${consoleEntryRegistered}`)
     if (!consoleService || consoleEntryRegistered) return
 
     consoleService.addEntry({
@@ -465,11 +479,11 @@ export function applyAccountService(ctx: Context, config: PluginConfig, logger: 
     })
 
     consoleEntryRegistered = true
-    logger.info('已注册微博登录控制台页面入口')
+    logger.info('[weibo-notify] 已成功注册微博登录控制台页面入口')
   }
 
   const registerServerRoutes = () => {
-    const server = ctx.get('server') as any
+    const server = (ctx as any).server || (ctx as any).get?.('server')
     if (!server || serverRoutesRegistered) return
 
     server.get(`${ACCOUNT_API_PREFIX}/status`, async (koa: any) => {
@@ -499,14 +513,46 @@ export function applyAccountService(ctx: Context, config: PluginConfig, logger: 
     ctx.on('ready', async () => {
       try {
         const loaded = await loadCookieStringFromDatabase(ctx)
+        // 增加对 SUB 核心凭证的强校验
         if (loaded) {
+          // 验证是否有实质性的登录标识，如果只有 X-CSRF-TOKEN 等无用 Cookie，直接视为无效
+          const hasMeaningfulCookie = loaded.includes('SUB=')
+          if (!hasMeaningfulCookie) {
+            logger.info('已加载无效的本地 Cookie (缺少核心凭证 SUB)，准备清理并重新登录。')
+            try {
+              await ctx.database.remove('weibo_cookies', {})
+            } catch (e) { }
+            // 主动触发扫码
+            refreshCookieWithPuppeteer().catch(() => { })
+            throw new Error('无效的本地 Cookie')
+          }
+
           setCookie(loaded)
           await syncProfile(loaded)
+
+          // 最终确认：必须成功解析到用户信息才算真正成功
+          if (!currentProfile) {
+            setCookie(null)
+            try {
+              await ctx.database.remove('weibo_cookies', {})
+            } catch (e) { }
+            // 主动触发扫码
+            refreshCookieWithPuppeteer().catch(() => { })
+            throw new Error('无法获取用户信息，可能是账号异常或游客状态')
+          }
+
           loginState = 'success'
+          lastError = null // 成功加载后清除错误信息
           loginMessage = currentProfile?.screenName
             ? `已加载 ${currentProfile.screenName} 的 Cookie`
             : '已加载本地 Cookie'
           lastCookieRefreshAt = await getCookieUpdatedAt()
+
+          const uidMatch = loaded.match(/uid=(\d+)/i) || loaded.match(/ALF=(\d+)/i) || loaded.match(/wvr=6;[\s\S]*?(\d{10,})/)
+          const uid = currentProfile?.uid || (uidMatch ? uidMatch[1] : '未知')
+          const uname = currentProfile?.screenName || '未知用户'
+          logger.info(`[weibo-notify] 加载 Cookie 成功！当前用户名: ${uname}, UID: ${uid}`)
+
           logger.info(currentProfile?.screenName ? `已加载 ${currentProfile.screenName} 的本地 Cookie` : '已加载本地 Cookie')
           resolvePromise()
         } else {

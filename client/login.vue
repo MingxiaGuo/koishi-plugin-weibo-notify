@@ -1,5 +1,5 @@
 <template>
-  <div v-if="props.name?.includes('weibo-notify')" style="margin-bottom: 1rem;">
+  <div v-if="isCurrentPlugin" style="margin-bottom: 1rem;">
     <div :class="['card']" data-weibo-notify-account-panel="schema">
       <div class="subtitle">
         {{ showProfileCard ? '当前微博账号' : '登录微博' }}
@@ -78,9 +78,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, inject } from 'vue'
 
 const props = defineProps<{ name?: string }>()
+
+// 使用 Koishi 配置页内部提供的局部变量来判断当前是不是自己
+const local = inject<any>('manager.settings.local', {})
+const isCurrentPlugin = computed(() => {
+  const pluginName = local.value?.name
+  return pluginName === 'weibo-notify' || pluginName === 'koishi-plugin-weibo-notify'
+})
 
 const ACCOUNT_API_PREFIX = '/weibo-notify/api'
 
